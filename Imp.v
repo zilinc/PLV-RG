@@ -191,10 +191,6 @@ Abort.  (* TODO *)
 Inductive avalue : aexp -> Prop :=
   | AV : forall n, avalue (ANum n).
 
-Inductive bvalue : bexp -> Prop :=
-  | BVT : bvalue BTrue
-  | BVF : bvalue BFalse.
-
 
 (* Small-step *)
 
@@ -259,7 +255,6 @@ Inductive beval1 : (state * bexp) -> (state * bexp) -> Prop :=
   | B_OrF   : forall st b2, (st, <{false || b2}>) ~>b1 (st, <{b2}>)
   | B_OrL   : forall st st' b1 b1' b2, (st, b1) ~>b1 (st', b1')
                                     -> (st, <{b1 || b2}>) ~>b1 (st', <{b1' || b2}>)
-(* And , Or *)
   where "c0 ~>b1 c1" := (beval1 c0 c1).
 
 
