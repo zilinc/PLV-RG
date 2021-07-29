@@ -66,6 +66,12 @@ Notation "'~' b" := (BNot b) (in custom com at level 75, right associativity).
 Notation "x || y" := (BOr x y) (in custom com at level 81, left associativity).
 Open Scope com_scope.
 
+
+(* TODO: Built-in map:
+     Interface: https://coq.inria.fr/library/Coq.FSets.FMapInterface.html
+     One implementation using lists: https://coq.inria.fr/stdlib/Coq.FSets.FMapList.html
+ *)
+
 Definition state := string -> nat.
 
 Fixpoint aeval (st : state) (a : aexp) : nat :=
@@ -114,13 +120,13 @@ Notation "'while' x 'do' y 'end'" :=
 Definition t_update (m : string -> nat) (x : string) (v : nat) :=
   fun x' => if String.eqb x x' then v else m x'.
 
-Notation "x '!->' v ';' m" := (t_update m x v)
+Notation "x !-> v ; m" := (t_update m x v)
                               (at level 100, v at next level, right associativity).
 
 Reserved Notation
-         " '[' st ',' c ']=>' st'"
+         "[ st , c ]=> st'"
          (at level 40, c custom com at level 99,
-          st constr, st' constr at next level) .
+          st constr, st' constr at next level).
 Inductive cexec : com -> state -> state -> Prop :=
   | E_Skip : forall st,
        [ st, skip ]=> st
@@ -152,7 +158,7 @@ Inductive cexec : com -> state -> state -> Prop :=
 
 
 (* Exercise 2.7 (p20) *)
-Lemma exo27 : forall st st', ~ ( [ st, while true do skip end ]=> st').
+Lemma exo27 : forall st st', ~ ([ st, while true do skip end ]=> st').
 intros st st' h.
 remember <{while true do skip end}> as pr eqn:eq_pr.
 induction h; cbn in *;try discriminate.
@@ -164,5 +170,121 @@ Qed.
 
 (* Definition Σ := string -> nat. *)
 Definition cequiv (c0 c1 : com) : Prop :=
-  forall s s', [ s, c0]=> s' <-> [ s, c1]=> s'.
+  forall s s', [s, c0]=> s' <-> [s, c1]=> s'.
+
+Notation "c0 ~ c1" := (cequiv c0 c1)
+                      (at level 90).
+
+
+(* ####################################################### *)
+(** §2.5 *)
+
+Lemma prop28 : forall b c w, w = <{while b do c end}> -> w ~ <{if b then c ; w else skip end}>.
+Abort.  (* TODO *)
+
+
+(* ####################################################### *)
+(** §2.6 Small-step operational semantics *)
+
+(* Values *)
+
+Inductive avalue : aexp -> Prop :=
+  | AV : forall n, avalue (ANum n).
+
+Inductive bvalue : bexp -> Prop :=
+  | BVT : bvalue BTrue
+  | BVF : bvalue BFalse.
+
+
+(* Small-step *)
+
+Reserved Notation
+  "c0 ~>a1 c1" (at level 40).
+
+(* NOTE: It deviates from the book in that, when an expression evaluates, we transition from
+   state to state' in the inductive cases. In the book, the small-step rules are formulated as,
+   e.g.
+           <a0, σ> ~>a1 <a0', σ>
+    ---------------------------------
+     <a0 + a1, σ> ~>a1 <a0' + a1, σ>
+   where the out-state is explicitly the same as the in-state.
+ *)
+Inductive aeval1 : (state * aexp) -> (state * aexp) -> Prop :=
+  | A_Id    : forall st v, (st, AId v) ~>a1 (st, ANum (st v))
+  | A_Plus   : forall st v1 v2, (st, <{ANum v1 + ANum v2}>) ~>a1 (st, ANum (v1 + v2))
+  | A_PlusL  : forall st a1 a1' a2, (st, a1) ~>a1 (st, a1')
+                                     -> (st, <{a1 + a2}>) ~>a1 (st, <{a1' + a2}>)
+  | A_PlusR  : forall st st' v1 a2 a2', (st, a2) ~>a1 (st', a2')
+                                     -> avalue v1
+                                     -> (st, <{v1 + a2}>) ~>a1 (st, <{v1 + a2'}>)
+  | A_Minus  : forall st v1 v2, (st, <{ANum v1 - ANum v2}>) ~>a1 (st, ANum (v1 - v2))
+  | A_MinusL : forall st st' a1 a1' a2, (st, a1) ~>a1 (st', a1')
+                                     -> (st, <{a1 - a2}>) ~>a1 (st', <{a1' - a2}>)
+  | A_MinusR : forall st st' v1 a2 a2', (st, a2) ~>a1 (st', a2')
+                                     -> avalue v1
+                                     -> (st, <{v1 - a2}>) ~>a1 (st, <{v1 - a2'}>)
+  | A_Mult   : forall st v1 v2, (st, <{ANum v1 * ANum v2}>) ~>a1 (st, ANum (v1 * v2))
+  | A_MultL  : forall st st' a1 a1' a2, (st, a1) ~>a1 (st', a1')
+                                     -> (st, <{a1 * a2}>) ~>a1 (st', <{a1' * a2}>)
+  | A_NultR  : forall st st' v1 a2 a2', (st, a2) ~>a1 (st', a2')
+                                     -> avalue v1
+                                     -> (st, <{v1 * a2}>) ~>a1 (st, <{v1 * a2'}>)
+  where "c0 ~>a1 c1" := (aeval1 c0 c1).
+
+
+Reserved Notation
+  "c0 ~>b1 c1" (at level 40).
+Inductive beval1 : (state * bexp) -> (state * bexp) -> Prop :=
+  | B_Eq    : forall st v1 v2, (st, <{ANum v1 = ANum v2}>) ~>b1 (st, if v1 =? v2 then <{true}> else <{false}>)
+  | B_EqL   : forall st a1 a1' a2, (st, a1) ~>a1 (st, a1')
+                                -> (st, <{a1 = a2}>) ~>b1 (st, <{a1' = a2}>)
+  | B_EqR   : forall st v1 a2 a2', (st, a2) ~>a1 (st, a2')
+                                -> avalue v1
+                                -> (st, <{v1 = a2}>) ~>b1 (st, <{v1 = a2'}>)
+  | B_Le    : forall st v1 v2, (st, <{ANum v1 <= ANum v2}>) ~>b1 (st, if v1 <=? v2 then <{true}> else <{false}>)
+  | B_LeL   : forall st a1 a1' a2, (st, a1) ~>a1 (st, a1')
+                                -> (st, <{a1 <= a2}>) ~>b1 (st, <{a1' <= a2}>)
+  | B_LeR   : forall st v1 a2 a2', (st, a2) ~>a1 (st, a2')
+                                -> avalue v1
+                                -> (st, <{v1 <= a2}>) ~>b1 (st, <{v1 <= a2'}>)
+  | B_NotT  : forall st, (st, <{~ true}>) ~>b1 (st, <{false}>)
+  | B_NotF  : forall st, (st, <{~ false}>) ~>b1 (st, <{true}>)
+  | B_Not   : forall st st' b b', (st, b) ~>b1 (st', b')
+                               -> (st, <{~ b}>) ~>b1 (st', <{~ b'}>)
+  | B_AndF  : forall st b2, (st, <{false && b2}>) ~>b1 (st, <{false}>)  (* a short-circuiting evaluation *)
+  | B_AndT  : forall st b2, (st, <{true && b2}>) ~>b1 (st, <{b2}>)
+  | B_AndL  : forall st st' b1 b1' b2, (st, b1) ~>b1 (st', b1')
+                                    -> (st, <{b1 && b2}>) ~>b1 (st', <{b1' && b2}>)
+  | B_OrT   : forall st b2, (st, <{true || b2}>) ~>b1 (st, <{true}>)  (* a short-circuiting evaluation *)
+  | B_OrF   : forall st b2, (st, <{false || b2}>) ~>b1 (st, <{b2}>)
+  | B_OrL   : forall st st' b1 b1' b2, (st, b1) ~>b1 (st', b1')
+                                    -> (st, <{b1 || b2}>) ~>b1 (st', <{b1' || b2}>)
+(* And , Or *)
+  where "c0 ~>b1 c1" := (beval1 c0 c1).
+
+
+Reserved Notation
+  "c0 ~>c1 c1" (at level 40).
+(* NOTE: The resultant option type is hinted by the book (p25):
+   "we need some way to represent the fact that the command is empty".
+ *)
+Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
+  | C_Skip  : forall st, (st, <{skip}>) ~>c1 (st, None)
+  | C_AsgnV : forall st x v, (st, <{x := ANum v}>) ~>c1 (x !-> v ; st, None)
+  | C_AsgnE : forall st st' x a a', (st, a) ~>a1 (st, a')
+                                 -> (st, <{x := a}>) ~>c1 (st', Some <{x := a'}>)
+  | C_Seq0  : forall st st' c1 c2, (st, c1) ~>c1 (st', None)
+                                -> (st, <{c1 ; c2}>) ~>c1 (st', Some c2)
+  | C_Seq1  : forall st st' c1 c1' c2, (st, c1) ~>c1 (st', Some c1')
+                                    -> (st, <{c1 ; c2}>) ~>c1 (st', Some <{c1' ; c2}>)
+  | C_IfT   : forall st c1 c2, (st, <{if true then c1 else c2 end}>) ~>c1 (st, Some c1)
+  | C_IfF   : forall st c1 c2, (st, <{if false then c1 else c2 end}>) ~>c1 (st, Some c2)
+  | C_IfC   : forall st st' b b' c1 c2, (st, b) ~>b1 (st', b')
+                                     -> (st, <{if b then c1 else c2 end}>) ~>c1 (st', Some <{if b' then c1 else c2 end}>)
+  | CWhileT : forall st c, (st, <{while true do c end}>) ~>c1 (st, Some <{c ; while true do c end}>)
+  | CWhileF : forall st c, (st, <{while false do c end}>) ~>c1 (st, None)
+  | CWhileC : forall st st' b b' c, (st, b) ~>b1 (st', b')
+                                 -> (st, <{while b do c end}>) ~>c1 (st', Some <{while b' do c end}>)
+  where "c0 ~>c1 c1" := (cexec1 c0 c1).
+
 
