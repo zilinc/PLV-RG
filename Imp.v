@@ -6,6 +6,7 @@ Check string.
 
 Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
 Require Import Nat.
+Require Import Relations.Relation_Operators.
 
 
 (* ####################################################### *)
@@ -161,7 +162,7 @@ Inductive cexec : com -> state -> state -> Prop :=
 Lemma exo27 : forall st st', ~ ([ st, while true do skip end ]=> st').
 intros st st' h.
 remember <{while true do skip end}> as pr eqn:eq_pr.
-induction h; cbn in *;try discriminate.
+induction h; cbn in *; try discriminate.
 destruct b; cbn in *; discriminate.
 apply IHh2.
 assumption.
@@ -180,7 +181,43 @@ Notation "c0 ~ c1" := (cequiv c0 c1)
 (** §2.5 *)
 
 Lemma prop28 : forall b c w, w = <{while b do c end}> -> w ~ <{if b then c ; w else skip end}>.
-Abort.  (* TODO *)
+Proof.
+  (* => *)
+  intros.
+  split.
+  * intros.
+    induction H0; try injection H; try discriminate; intros.
+    (* 1 => as per the proof in the book *)
+    + apply E_IfFalse.
+      - rewrite H2 in H0. trivial.
+      - apply E_Skip.
+    (* 2 => *)
+    + apply E_IfTrue.
+      - rewrite H2 in H0; assumption.
+      - apply E_Seq with (st' := st').
+        ** rewrite H1 in H0_; assumption.
+        ** assumption.
+  (* <= *)
+  * destruct (beval s b) eqn:b_eval. all:swap 1 2.
+    (* 1 <= *)
+    + intros.
+      inversion H0.
+      - rewrite H6 in b_eval; discriminate.
+      - inversion H7.
+        rewrite <- H10.
+        rewrite H.
+        apply E_WhileFalse. assumption.
+    (* 2 <= *)
+    + intros.
+      inversion H0.
+      - inversion H7.
+        rewrite H.
+        apply E_WhileTrue with (st := s) (st'' := s') (st' := st'0).
+        ** assumption.
+        ** assumption.
+        ** rewrite <- H. assumption.
+      - rewrite H6 in b_eval. discriminate.
+Qed.
 
 
 (* ####################################################### *)
@@ -281,5 +318,10 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
   | CWhileC : forall st st' b b' c, (st, b) ~>b1 (st', b')
                                  -> (st, <{while b do c end}>) ~>c1 (st', Some <{while b' do c end}>)
   where "c0 ~>c1 c1" := (cexec1 c0 c1).
+
+
+(* Reflexive-transitive closure:
+   https://coq.inria.fr/library/Coq.Relations.Relation_Operators.html#Reflexive_Transitive_Closure
+*)
 
 
