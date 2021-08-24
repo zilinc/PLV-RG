@@ -325,3 +325,58 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
 *)
 
 
+
+Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
+       (* Think of phi as the (relational) denotation of [while b do c]
+             (as the fixpoint of Gamma)
+        *)
+          (phi : state -> state -> Prop) : state -> state -> Prop :=
+  fun s1 s2 => if sem_b s1 then exists s , phi s s2 /\ sem_c s1 s else s1 = s2.
+
+Definition lfp_simpl (F : Prop -> Prop) : Prop :=
+  forall (P : Prop), ( F P -> P) -> P.
+
+Lemma lfp_simpl_is_prefixpoint (F : Prop -> Prop)
+  (fmon : forall (P Q : Prop), (P -> Q) -> (F P -> F Q)) :
+  lfp_simpl F -> F (lfp_simpl F).
+Proof.
+  unfold lfp_simpl.
+  intro h.
+  apply h.
+  apply fmon.
+  intro h'.
+  exact h.
+Qed.
+
+
+
+
+Definition lfp {A} (F : (A -> A -> Prop) -> (A -> A -> Prop)) : A -> A -> Prop :=
+  fun a a' => forall (P : A -> A -> Prop), (forall a a', F P a a' -> P a a') -> P a a'.
+
+Lemma lfp_is_prefixpoint {A}(F : (A -> A -> Prop) -> (A -> A -> Prop)) 
+      (fmon : forall (P Q : A -> A -> Prop), (forall a a', P a a' -> Q a a') ->
+                           (forall a a', F P a a' -> F Q a a')) :
+  forall a a', lfp F a a' -> F (lfp F) a a'.
+    unfold lfp.
+  intros a a' h.
+  apply (h (fun a0 a'0 : A => forall P : A -> A -> Prop, (forall a1 a'1 : A, F P a1 a'1 -> P a1 a'1) -> P a0 a'0)).
+  - intros b b'.
+    intros.
+  
+Abort.
+
+Fixpoint cexec' (prog : com) (st1 : state)  (st2 : state) { struct prog }: Prop.
+  refine (
+  match prog with
+    CWhile b c => lfp (Gamma (fun st => beval st b) (cexec' c))
+                     st1 st2
+  | CSkip => st1 = st2
+  | CSeq c0 c1 => exists st, _
+  | _ => _
+  end).
+  Guarded.
+Abort.
+    
+
+
