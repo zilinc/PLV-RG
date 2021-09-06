@@ -1,2 +1,2 @@
 all:
-	coqc -Q . Winskel Imp.v
+	coqc -Q . Winskel PropFixpoint.v Imp.v
