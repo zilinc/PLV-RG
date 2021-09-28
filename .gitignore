@@ -1,3 +1,21 @@
 *~
 *#*
 .DS_Store
+
+# coq
+*.v.d
+*.glob
+*.vo
+*.vo.aux
+Makefile.coq
+Makefile.coq.conf
+Makefile.conf
+Makefile
+_build
+*.d
+*.aux
+*.glob
+*.vio
+*.vok
+*.vos
+.lia.cache
