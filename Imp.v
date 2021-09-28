@@ -340,11 +340,14 @@ Fixpoint cexec' (prog : com) (st1 : state)  (st2 : state) { struct prog }: Prop.
     CWhile b c => fixRel (Gamma (fun st => beval st b) (cexec' c))
                      st1 st2
   | CSkip => st1 = st2
-  | CSeq c0 c1 => exists st, _
+  | CSeq c0 c1 => exists st, cexec' c0 st1 st /\ cexec' c1 st st2
+  | CIfc b c0 c1 => _
   | _ => _
   end).
   Guarded.
 Abort.
     
-
+Definition 𝒜 e := fun st => (aeval st e).
+Definition ℬ e := fun st => (beval st e).
+(* Inductive 𝒞 *)
 
