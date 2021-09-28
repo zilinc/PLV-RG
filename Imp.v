@@ -324,7 +324,8 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
    https://coq.inria.fr/library/Coq.Relations.Relation_Operators.html#Reflexive_Transitive_Closure
 *)
 
-
+(* ####################################################### *)
+(** §5.2 Denotational Semantics for Commands *)
 
 Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
        (* Think of phi as the (relational) denotation of [while b do c]
@@ -334,20 +335,51 @@ Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
   fun s1 s2 => if sem_b s1 then exists s , phi s s2 /\ sem_c s1 s else s1 = s2.
 
 
-Fixpoint cexec' (prog : com) (st1 : state)  (st2 : state) { struct prog }: Prop.
-  refine (
+Fixpoint cexec' (prog : com) (st1 : state)  (st2 : state) { struct prog }: Prop :=
   match prog with
     CWhile b c => fixRel (Gamma (fun st => beval st b) (cexec' c))
                      st1 st2
   | CSkip => st1 = st2
   | CSeq c0 c1 => exists st, cexec' c0 st1 st /\ cexec' c1 st st2
-  | CIfc b c0 c1 => _
-  | _ => _
-  end).
-  Guarded.
-Abort.
-    
+  | CIf b c0 c1 => if beval st1 b then cexec' c0 st1 st2 else cexec' c1 st1 st2
+  | CAsgn x a => (x !-> aeval st1 a ; st1) = st2
+  end.
+
+
 Definition 𝒜 e := fun st => (aeval st e).
 Definition ℬ e := fun st => (beval st e).
 (* Inductive 𝒞 *)
+
+
+(* Proposition 5.1, page 60. *)
+Lemma prop_5_1: forall b c, cexec' <{ while b do c end }> = cexec' <{ if b then c ; while b do c end else skip end }>.
+Admitted.
+
+(* ####################################################### *)
+(** §5.3 Equivalence of the semantics *)
+
+Lemma lemma_5_6 : forall st st' c, [ st , c ]=> st' -> cexec' c st st'.
+Proof.
+intros.
+induction H.
+  * unfold cexec'. trivial.
+  * unfold cexec'. f_equal. assumption.
+  * unfold cexec'. fold cexec'. exists st'.
+    split. apply IHcexec1. apply IHcexec2.
+  * unfold cexec'. rewrite H. fold cexec'. assumption.
+  * unfold cexec'. rewrite H. fold cexec'. assumption.
+  * unfold cexec'. fold cexec'. unfold fixRel. unfold Gamma.
+    intros.
+    apply H0. rewrite H. trivial.
+  * rewrite prop_5_1.
+    unfold cexec'. fold cexec'.
+    rewrite H.
+    exists st'.
+    split.
+    + assumption.
+    + apply IHcexec2.
+Qed.
+
+
+
 
