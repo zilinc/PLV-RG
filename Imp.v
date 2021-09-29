@@ -329,7 +329,7 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
 
 Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
        (* Think of phi as the (relational) denotation of [while b do c]
-             (as the fixpoint of Gamma)
+             (as the fixpbgoint of Gamma)
         *)
           (phi : state -> state -> Prop) : state -> state -> Prop :=
   fun s1 s2 => if sem_b s1 then exists s , phi s s2 /\ sem_c s1 s else s1 = s2.
@@ -351,9 +351,84 @@ Definition ℬ e := fun st => (beval st e).
 (* Inductive 𝒞 *)
 
 
+Lemma Gamma_mon:
+  forall A B (P Q : state -> state -> Prop),
+    (forall a b, P a b -> Q a b) ->
+      (forall a b, Gamma A B P a b -> Gamma A B Q a b).
+Proof.
+  unfold Gamma.
+  intros.
+  destruct (A a).
+  * destruct H0. destruct H0.
+    exists x.
+    split.
+    + apply H. assumption.
+    + assumption.
+  * assumption.
+Qed.
+
+Lemma post_fixRel_Gamma:
+  forall A B a b,
+    fixRel (Gamma A B) a b ->
+    Gamma A B (fixRel (Gamma A B)) a b.
+Proof.
+  intros A B.
+  apply post_fixRel.
+  apply Gamma_mon.
+Qed.
+
+
+Lemma pre_fixRel_Gamma:
+  forall A B a b,
+  Gamma A B (fixRel (Gamma A B)) a b ->
+  fixRel (Gamma A B) a b.
+Proof.
+  intros A B.
+  apply pre_fixRel.
+  apply Gamma_mon.
+Qed.
+
 (* Proposition 5.1, page 60. *)
-Lemma prop_5_1: forall b c, cexec' <{ while b do c end }> = cexec' <{ if b then c ; while b do c end else skip end }>.
-Admitted.
+Lemma prop_5_1a_unfold:
+  forall b c st st',
+    cexec' <{ while b do c end }> st st'
+    -> cexec' <{ if b then c ; while b do c end else skip end }> st st'.
+Proof.
+  intros b c st st' W.
+  apply post_fixRel_Gamma in W.
+  fold cexec' in W.
+  unfold cexec'. fold cexec'.
+  unfold Gamma in W.
+  destruct (beval st b).
+  * destruct W.
+    destruct H.
+    exists x.
+    split.
+    + assumption.
+    + assumption.
+  * assumption.
+Qed.
+
+Lemma prop_5_1_fold:
+  forall b c st st',
+    cexec' <{ if b then c ; while b do c end else skip end }> st st'
+    -> cexec' <{ while b do c end }> st st'.
+Proof.
+  intros b c st st' W.
+  apply pre_fixRel_Gamma.
+  fold cexec'.
+  unfold cexec' in W. fold cexec' in W.
+  unfold Gamma.
+  destruct (beval st b).
+  * destruct W.
+    destruct H.
+    exists x.
+    split.
+    + assumption.
+    + assumption.
+  * assumption.
+Qed.
+
 
 (* ####################################################### *)
 (** §5.3 Equivalence of the semantics *)
@@ -371,7 +446,7 @@ induction H.
   * unfold cexec'. fold cexec'. unfold fixRel. unfold Gamma.
     intros.
     apply H0. rewrite H. trivial.
-  * rewrite prop_5_1.
+  * apply prop_5_1_fold.
     unfold cexec'. fold cexec'.
     rewrite H.
     exists st'.
@@ -379,7 +454,3 @@ induction H.
     + assumption.
     + apply IHcexec2.
 Qed.
-
-
-
-
