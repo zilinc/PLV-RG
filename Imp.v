@@ -439,18 +439,59 @@ intros.
 induction H.
   * unfold cexec'. trivial.
   * unfold cexec'. f_equal. assumption.
-  * unfold cexec'. fold cexec'. exists st'.
+  * simpl. exists st'.
     split. apply IHcexec1. apply IHcexec2.
-  * unfold cexec'. rewrite H. fold cexec'. assumption.
-  * unfold cexec'. rewrite H. fold cexec'. assumption.
-  * unfold cexec'. fold cexec'. unfold fixRel. unfold Gamma.
+  * simpl. rewrite H. assumption.
+  * simpl. rewrite H. assumption.
+  * simpl. unfold fixRel. unfold Gamma.
     intros.
     apply H0. rewrite H. trivial.
   * apply prop_5_1_fold.
-    unfold cexec'. fold cexec'.
+    simpl.
     rewrite H.
     exists st'.
     split.
     + assumption.
     + apply IHcexec2.
 Qed.
+
+Require Import Coq.Program.Equality.
+
+Lemma lemma_5_7: forall st st' c, cexec' c st st' -> [ st , c ]=> st'.
+Proof.
+intros.
+dependent induction c generalizing st st'.
+* unfold cexec' in H. rewrite <- H. apply E_Skip.
+* unfold cexec' in H. rewrite <- H. apply E_Asgn. trivial.
+* simpl in H.
+  destruct H as [st''].
+  destruct H as [H1 H2].
+  apply E_Seq with (st' := st'').
+  + apply IHc1. apply H1.
+  + apply IHc2. apply H2.
+* simpl in H.
+  destruct (beval st b) eqn:b_eq.
+  + apply E_IfTrue. 
+    - assumption.
+    - apply IHc1. trivial.
+  + apply E_IfFalse.
+    - trivial.
+    - apply IHc2. trivial.
+* apply prop_5_1a_unfold in H.
+  simpl in H.
+  destruct (beval st b) eqn:b_eq.
+  destruct H as [st''].
+  destruct H as [H0 Hs].
+  apply E_WhileTrue with (st' := st'').
+  + trivial.
+  + apply IHc. apply H0.
+  + admit.
+  + rewrite <- H.
+    apply E_WhileFalse. trivial.
+
+
+
+
+
+
+
