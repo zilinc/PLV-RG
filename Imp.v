@@ -458,13 +458,56 @@ Qed.
 Require Import Coq.Program.Equality.
 
 
+Inductive stepRel {A} (R : (A -> A -> Prop))
+  : nat -> A -> A -> Prop :=
+| stepRelbase : forall (a : A), stepRel R 0 a a
+| stepRel_step : forall n (a b c : A),
+  R a b -> stepRel R n b c -> stepRel R (S n) a c.
+
+Definition Gamma2
+  {A}
+  (cond : A -> bool)
+  (step : A -> A -> Prop)
+  (R : A -> A -> Prop) : A -> A -> Prop :=
+  fun a c =>
+    if cond a then exists b, step a b /\ R b c else a = c.
+
+Lemma Gamma2_mon:
+  forall {A} cond step (R1 R2 : A -> A -> Prop),
+    (forall a b, R1 a b -> R2 a b) ->
+      (forall a b, Gamma2 cond step R1 a b -> Gamma2 cond step R2 a b).
+Proof.
+  unfold Gamma2.
+  intros.
+  destruct (cond a).
+  * destruct H0. destruct H0.
+    exists x.
+    auto.
+  * assumption.
+Qed.
+
+Lemma fixRel_to_stepRel :
+  forall {A} 
+    cond step
+    a b (R : A -> A -> Prop),
+    fixRel (Gamma2 cond step) a b ->
+    (exists n, stepRel R n a b).
+Admitted.
+
+
 Fixpoint theta (n : nat) b c (st st' : state) : Prop :=
   match n with
   | 0 => False
   | S n' => if beval st b
              then exists st'', cexec' c st st'' /\ theta n' b c st'' st' 
              else st = st'
- end.
+end.
+
+Lemma foo :
+forall st st' b c,
+  cexec' <{ while b do c end }> st st' ->
+  exists n, theta n b c st st'.
+Admitted.
 
 
 Lemma lemma_5_7: forall st st' c, cexec' c st st' -> [ st , c ]=> st'.
@@ -487,29 +530,6 @@ dependent induction c generalizing st st'.
   + apply E_IfFalse.
     - trivial.
     - apply IHc2. trivial.
-* assert (forall st st', fixRel (Gamma (fun st => beval st b) (cexec' c)) st st'
-                      -> [ st , <{while b do c end}> ]=> st').
-  + intros st1 st2.
-    - intros.
-      apply post_fixRel_Gamma in H0; fold cexec' in H0; unfold Gamma in H0.
-      destruct (beval st1 b) eqn:b_eq.
-      ** destruct H0 as [st12].
-         destruct H0.
-         apply E_WhileTrue with (st' := st12).
-         ++ trivial.
-         ++ apply IHc. trivial.
-         ++ apply post_fixRel_Gamma in H0.
-      simpl in H.
-      apply IHc in H.
-      unfold Gamma. unfold fixRel.
-      intros.
-      apply H0.
-      intros s s'.
-      rewrite b_eq.
-      simpl.
-  + simpl in H.
-    apply H0.
-    trivial.
 * assert (forall n st st', theta n b c st st' -> [ st , <{while b do c end}> ]=> st').
   + induction n.
     - intros st0 st0' H_theta.
@@ -518,20 +538,19 @@ dependent induction c generalizing st st'.
       simpl in H_theta.
       destruct (beval st0 b) eqn:b_eq.
       ** destruct H_theta as [st'' H_theta].
-         destruct H_theta as [H0 Hs].
-         apply IHc in H0.
-         apply E_WhileTrue with (st' := st'').
-         ++ trivial.
-         ++ trivial.
-         ++ apply IHn. trivial. 
+          destruct H_theta as [H0 Hs].
+          apply IHc in H0.
+          apply E_WhileTrue with (st' := st'').
+          ++ trivial.
+          ++ trivial.
+          ++ apply IHn. trivial. 
       ** rewrite <- H_theta.
-         apply E_WhileFalse. trivial.
-  + assert (Gamma beval cexec' (fn _ _ => False) = theta ).
-    - intros.
-      unfold theta; simpl.
-
-
-
+          apply E_WhileFalse. trivial.
+  + apply foo in H.
+    destruct H as [n].
+    apply H0 with (n := n).
+    apply H.
+Qed.
 
 
 
