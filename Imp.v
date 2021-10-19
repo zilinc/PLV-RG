@@ -7,6 +7,7 @@ Require Import Winskel.PropFixpoint.
 Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
 Require Import Nat.
 Require Import Relations.Relation_Operators.
+Require Import Coq.Program.Equality. (* dependent induction *)
 
 
 (* ####################################################### *)
@@ -327,13 +328,48 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
 (* ####################################################### *)
 (** §5.2 Denotational Semantics for Commands *)
 
-Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
-       (* Think of phi as the (relational) denotation of [while b do c]
-             (as the fixedpoint of Gamma)
-        *)
-          (phi : state -> state -> Prop) : state -> state -> Prop :=
-  fun s1 s2 => if sem_b s1 then exists s , phi s s2 /\ sem_c s1 s else s1 = s2.
+Definition Gamma
+  {A}
+  (cond : A -> bool)
+  (step : A -> A -> Prop)
+  (R : A -> A -> Prop) : A -> A -> Prop :=
+  fun a c =>
+    if cond a then exists b, step a b /\ R b c else a = c.
 
+Lemma Gamma_mon:
+  forall {A} cond step (R1 R2 : A -> A -> Prop),
+    (forall a b, R1 a b -> R2 a b) ->
+      (forall a b, Gamma cond step R1 a b -> Gamma cond step R2 a b).
+Proof.
+  unfold Gamma.
+  intros.
+  destruct (cond a).
+  * destruct H0. destruct H0.
+    exists x.
+    split; firstorder.
+  * assumption.
+Qed.
+
+Lemma post_fixRel_Gamma:
+  forall {A} cond step (a b : A),
+    fixRel (Gamma cond step) a b ->
+    Gamma cond step (fixRel (Gamma cond step)) a b.
+Proof.
+  intros A cond step.
+  apply post_fixRel.
+  apply Gamma_mon.
+Qed.
+
+
+Lemma pre_fixRel_Gamma:
+  forall {A} cond step (a b : A),
+  Gamma cond step (fixRel (Gamma cond step)) a b ->
+  fixRel (Gamma cond step) a b.
+Proof.
+  intros A cond step.
+  apply pre_fixRel.
+  apply Gamma_mon.
+Qed.
 
 Fixpoint cexec' (prog : com) (st1 : state) (st2 : state) { struct prog }: Prop :=
   match prog with
@@ -351,42 +387,6 @@ Definition ℬ e := fun st => (beval st e).
 (* Inductive 𝒞 *)
 
 
-Lemma Gamma_mon:
-  forall A B (P Q : state -> state -> Prop),
-    (forall a b, P a b -> Q a b) ->
-      (forall a b, Gamma A B P a b -> Gamma A B Q a b).
-Proof.
-  unfold Gamma.
-  intros.
-  destruct (A a).
-  * destruct H0. destruct H0.
-    exists x.
-    split.
-    + apply H. assumption.
-    + assumption.
-  * assumption.
-Qed.
-
-Lemma post_fixRel_Gamma:
-  forall A B a b,
-    fixRel (Gamma A B) a b ->
-    Gamma A B (fixRel (Gamma A B)) a b.
-Proof.
-  intros A B.
-  apply post_fixRel.
-  apply Gamma_mon.
-Qed.
-
-
-Lemma pre_fixRel_Gamma:
-  forall A B a b,
-  Gamma A B (fixRel (Gamma A B)) a b ->
-  fixRel (Gamma A B) a b.
-Proof.
-  intros A B.
-  apply pre_fixRel.
-  apply Gamma_mon.
-Qed.
 
 (* Proposition 5.1, page 60. *)
 Lemma prop_5_1a_unfold:
@@ -404,8 +404,7 @@ Proof.
     destruct H.
     exists x.
     split.
-    + assumption.
-    + assumption.
+    all:assumption.
   * assumption.
 Qed.
 
@@ -424,8 +423,7 @@ Proof.
     destruct H.
     exists x.
     split.
-    + assumption.
-    + assumption.
+    all:assumption.
   * assumption.
 Qed.
 
@@ -455,46 +453,21 @@ induction H.
     + apply IHcexec2.
 Qed.
 
-Require Import Coq.Program.Equality.
 
-
-Inductive stepRel {A} (R : (A -> A -> Prop))
+Inductive stepRel {A} (cond : A -> bool) (R : A -> A -> Prop)
   : nat -> A -> A -> Prop :=
-| stepRelbase : forall (a : A), stepRel R 0 a a
-| stepRel_step : forall n (a b c : A),
-  R a b -> stepRel R n b c -> stepRel R (S n) a c.
-
-Definition Gamma2
-  {A}
-  (cond : A -> bool)
-  (step : A -> A -> Prop)
-  (R : A -> A -> Prop) : A -> A -> Prop :=
-  fun a c =>
-    if cond a then exists b, step a b /\ R b c else a = c.
-
-Lemma Gamma2_mon:
-  forall {A} cond step (R1 R2 : A -> A -> Prop),
-    (forall a b, R1 a b -> R2 a b) ->
-      (forall a b, Gamma2 cond step R1 a b -> Gamma2 cond step R2 a b).
-Proof.
-  unfold Gamma2.
-  intros.
-  destruct (cond a).
-  * destruct H0. destruct H0.
-    exists x.
-    auto.
-  * assumption.
-Qed.
+  | stepRel_False : forall (a : A),
+      cond a = false -> stepRel cond R 1 a a
+  | stepRel_True : forall n (a b c : A),
+      cond a = true -> R a b -> stepRel cond R n b c -> stepRel cond R (S n) a c.
 
 Lemma fixRel_to_stepRel :
-  forall {A} 
-    cond step
-    a b (R : A -> A -> Prop),
-    fixRel (Gamma2 cond step) a b ->
-    (exists n, stepRel R n a b).
+  forall {A} cond (step : A -> A -> Prop) a b,
+    fixRel (Gamma cond step) a b ->
+    (exists n, stepRel cond step n a b).
 Admitted.
 
-
+(* As of pp. 66 of the book *)
 Fixpoint theta (n : nat) b c (st st' : state) : Prop :=
   match n with
   | 0 => False
@@ -503,7 +476,7 @@ Fixpoint theta (n : nat) b c (st st' : state) : Prop :=
              else st = st'
 end.
 
-Lemma foo :
+Lemma cexec'_theta :
 forall st st' b c,
   cexec' <{ while b do c end }> st st' ->
   exists n, theta n b c st st'.
@@ -546,7 +519,7 @@ dependent induction c generalizing st st'.
           ++ apply IHn. trivial. 
       ** rewrite <- H_theta.
           apply E_WhileFalse. trivial.
-  + apply foo in H.
+  + apply cexec'_theta in H.
     destruct H as [n].
     apply H0 with (n := n).
     apply H.
