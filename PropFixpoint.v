@@ -69,7 +69,7 @@ Qed.
 (* The same, but for relations, and faster *)
 Section Relation.
   Context {A : Type}.
-  
+
   Notation Rel := (A -> A -> Prop).
 
   Notation "P ~> Q" := (forall a a', P a a' -> Q a a') (at level 40).
@@ -89,6 +89,7 @@ Section Relation.
     apply Fmon.
     firstorder.
   Qed.
+
   Lemma post_fixRel : fixRel ~> F fixRel.
   Proof.
     unfold fixRel.
@@ -97,5 +98,5 @@ Section Relation.
     apply Fmon.
     apply pre_fixRel.
   Qed.
- 
-End Relation.    
+
+End Relation.

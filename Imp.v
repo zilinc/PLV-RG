@@ -329,13 +329,13 @@ Inductive cexec1 : (state * com) -> (state * option com) -> Prop :=
 
 Definition Gamma (sem_b : state -> bool)(sem_c : state -> state -> Prop)
        (* Think of phi as the (relational) denotation of [while b do c]
-             (as the fixpbgoint of Gamma)
+             (as the fixedpoint of Gamma)
         *)
           (phi : state -> state -> Prop) : state -> state -> Prop :=
   fun s1 s2 => if sem_b s1 then exists s , phi s s2 /\ sem_c s1 s else s1 = s2.
 
 
-Fixpoint cexec' (prog : com) (st1 : state)  (st2 : state) { struct prog }: Prop :=
+Fixpoint cexec' (prog : com) (st1 : state) (st2 : state) { struct prog }: Prop :=
   match prog with
     CWhile b c => fixRel (Gamma (fun st => beval st b) (cexec' c))
                      st1 st2
@@ -433,7 +433,7 @@ Qed.
 (* ####################################################### *)
 (** §5.3 Equivalence of the semantics *)
 
-Lemma lemma_5_6 : forall st st' c, [ st , c ]=> st' -> cexec' c st st'.
+Lemma lemma_5_6: forall st st' c, [ st , c ]=> st' -> cexec' c st st'.
 Proof.
 intros.
 induction H.
@@ -457,6 +457,16 @@ Qed.
 
 Require Import Coq.Program.Equality.
 
+
+Fixpoint theta (n : nat) b c (st st' : state) : Prop :=
+  match n with
+  | 0 => False
+  | S n' => if beval st b
+             then exists st'', cexec' c st st'' /\ theta n' b c st'' st' 
+             else st = st'
+ end.
+
+
 Lemma lemma_5_7: forall st st' c, cexec' c st st' -> [ st , c ]=> st'.
 Proof.
 intros.
@@ -477,17 +487,49 @@ dependent induction c generalizing st st'.
   + apply E_IfFalse.
     - trivial.
     - apply IHc2. trivial.
-* apply prop_5_1a_unfold in H.
-  simpl in H.
-  destruct (beval st b) eqn:b_eq.
-  destruct H as [st''].
-  destruct H as [H0 Hs].
-  apply E_WhileTrue with (st' := st'').
-  + trivial.
-  + apply IHc. apply H0.
-  + admit.
-  + rewrite <- H.
-    apply E_WhileFalse. trivial.
+* assert (forall st st', fixRel (Gamma (fun st => beval st b) (cexec' c)) st st'
+                      -> [ st , <{while b do c end}> ]=> st').
+  + intros st1 st2.
+    - intros.
+      apply post_fixRel_Gamma in H0; fold cexec' in H0; unfold Gamma in H0.
+      destruct (beval st1 b) eqn:b_eq.
+      ** destruct H0 as [st12].
+         destruct H0.
+         apply E_WhileTrue with (st' := st12).
+         ++ trivial.
+         ++ apply IHc. trivial.
+         ++ apply post_fixRel_Gamma in H0.
+      simpl in H.
+      apply IHc in H.
+      unfold Gamma. unfold fixRel.
+      intros.
+      apply H0.
+      intros s s'.
+      rewrite b_eq.
+      simpl.
+  + simpl in H.
+    apply H0.
+    trivial.
+* assert (forall n st st', theta n b c st st' -> [ st , <{while b do c end}> ]=> st').
+  + induction n.
+    - intros st0 st0' H_theta.
+      unfold theta in H_theta. destruct H_theta.
+    - intros st0 st0' H_theta.
+      simpl in H_theta.
+      destruct (beval st0 b) eqn:b_eq.
+      ** destruct H_theta as [st'' H_theta].
+         destruct H_theta as [H0 Hs].
+         apply IHc in H0.
+         apply E_WhileTrue with (st' := st'').
+         ++ trivial.
+         ++ trivial.
+         ++ apply IHn. trivial. 
+      ** rewrite <- H_theta.
+         apply E_WhileFalse. trivial.
+  + assert (Gamma beval cexec' (fn _ _ => False) = theta ).
+    - intros.
+      unfold theta; simpl.
+
 
 
 
