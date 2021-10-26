@@ -458,16 +458,31 @@ Qed.
 Inductive stepRel {A} (cond : A -> bool) (R : A -> A -> Prop)
   : nat -> A -> A -> Prop :=
   | stepRel_False : forall (a : A),
-      cond a = false -> stepRel cond R 1 a a
+      cond a = false -> stepRel cond R 0 a a
   | stepRel_True : forall n (a b c : A),
       cond a = true -> R a b -> stepRel cond R n b c -> stepRel cond R (S n) a c.
 
-Print Gamma.
-Lemma Gamma_stepRel:
-  forall {A} cond (step : A -> A -> Prop) a b,
-    Gamma cond step R a b ->
-    stepRel cond step 1 a b.
+Lemma forall {A} cond (step : A -> A -> Prop) n a b, 
+  stepRel cond step n a a -> n=0.
 
+
+Lemma Gamma_stepRel:
+  forall {A} cond (step : A -> A -> Prop) n a b,
+    Gamma cond step (stepRel cond step n) a b ->
+    stepRel cond step (S n) a b.
+Proof. 
+  intros.  
+  remember (stepRel cond step n) as S.
+  unfold Gamma in H.
+  destruct (cond a) eqn: H'.
+  - destruct H. destruct H. subst.
+    econstructor;
+    eauto.  
+  - assert (n=0).
+  + 
+  + subst. econstructor. assumption.
+  
+  apply (stepRel_True _ _ _ x).  
 
 Lemma fixRel_to_stepRel :
   forall {A} cond (step : A -> A -> Prop) a b,
