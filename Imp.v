@@ -335,6 +335,7 @@ Definition Gamma
   (R : A -> A -> Prop) : A -> A -> Prop :=
   fun a c =>
     if cond a then exists b, step a b /\ R b c else a = c.
+ (* if cond a then (forall b, step a b -> R b c) /\ exists b, step a b else a = c. *)
 
 Lemma Gamma_mon:
   forall {A} cond step (R1 R2 : A -> A -> Prop),
@@ -461,10 +462,24 @@ Inductive stepRel {A} (cond : A -> bool) (R : A -> A -> Prop)
   | stepRel_True : forall n (a b c : A),
       cond a = true -> R a b -> stepRel cond R n b c -> stepRel cond R (S n) a c.
 
+Print Gamma.
+Lemma Gamma_stepRel:
+  forall {A} cond (step : A -> A -> Prop) a b,
+    Gamma cond step R a b ->
+    stepRel cond step 1 a b.
+
+
 Lemma fixRel_to_stepRel :
   forall {A} cond (step : A -> A -> Prop) a b,
     fixRel (Gamma cond step) a b ->
     (exists n, stepRel cond step n a b).
+Proof.
+intros.
+unfold fixRel in H.
+apply H.
+intros.
+apply (stepRel cond step 1) in H.
+eexists.
 Admitted.
 
 (* As of pp. 66 of the book *)

@@ -61,7 +61,7 @@ Lemma inf_is_post (F : Prop -> Prop)(Fmon : forall (P P' : Prop), (P -> P') -> (
   unfold is_post.
   intro H.
   apply H.
-  unfold is_pre,inf, is_post.
+  unfold is_pre, inf, is_post.
   firstorder.
 Qed.
 
