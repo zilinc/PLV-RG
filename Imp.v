@@ -462,6 +462,7 @@ Inductive stepRel {A} (cond : A -> bool) (R : A -> A -> Prop)
   | stepRel_True : forall n (a b c : A),
       cond a = true -> R a b -> stepRel cond R n b c -> stepRel cond R (S n) a c.
 
+(*
 Lemma forall {A} cond (step : A -> A -> Prop) n a b, 
   stepRel cond step n a a -> n=0.
 
@@ -484,6 +485,7 @@ Proof.
   
   apply (stepRel_True _ _ _ x).  
 
+
 Lemma fixRel_to_stepRel :
   forall {A} cond (step : A -> A -> Prop) a b,
     fixRel (Gamma cond step) a b ->
@@ -496,6 +498,8 @@ intros.
 apply (stepRel cond step 1) in H.
 eexists.
 Admitted.
+
+*)
 
 (* As of pp. 66 of the book *)
 Fixpoint theta (n : nat) b c (st st' : state) : Prop :=
@@ -554,6 +558,58 @@ dependent induction c generalizing st st'.
     apply H0 with (n := n).
     apply H.
 Qed.
+
+
+(* ####################################################### *)
+(** §6.2 The Assertion Language Assn *)
+
+(* Extending aexp to include integer variables (c.f. the beginning of p.81) *)
+Inductive aexpv : Type :=
+  | AvNum   : nat            -> aexpv
+  | AvId    : string         -> aexpv
+  | AvVar   : string         -> aexpv
+  | AvPlus  : aexpv -> aexpv -> aexpv
+  | AvMinus : aexpv -> aexpv -> aexpv
+  | AvMult  : aexpv -> aexpv -> aexpv.
+
+
+Inductive assn : Type :=
+  | AsTrue  : assn
+  | AsFalse : assn
+  | AsEq    : aexpv -> aexpv -> assn
+  | AsLe    : aexpv -> aexpv -> assn
+  | AsNot   : assn  -> assn
+  | AsAnd   : assn  -> assn  -> assn
+  | AsOr    : assn  -> assn  -> assn
+  | AsImp   : assn  -> assn  -> assn
+  | AsAll   : string -> assn -> assn
+  | AsEx    : string -> assn -> assn.
+
+
+(* TODO: define fv() and subst(). *)
+Section Subst.
+  Context {A : Type}
+          (fv_av : aexpv -> (A -> Prop))
+          (fv_as : assn  -> (A -> Prop))
+          (subst_av : aexpv -> A -> aexpv -> aexpv)
+          (subst_as : assn  -> A -> aexpv -> assn).
+
+  Notation "a [ x / i ]av" := (subst_av a i x) (at level 40).
+  Notation "a [ x / i ]as" := (subst_as a i x) (at level 40).
+
+(** §6.3 The semantics of Assn *)
+
+  Fixpoint av (a : aexpv) (I : string -> nat) (st : state): nat :=
+    match a with
+    | AvNum n => n
+    | AvId  x => st x
+    | AvVar i => I i
+    | AvPlus  a1 a2 => (av a1 I st) + (av a2 I st)
+    | AvMinus a1 a2 => (av a1 I st) - (av a2 I st)
+    | AvMult  a1 a2 => (av a1 I st) * (av a2 I st)
+    end.
+
+End Subst.
 
 
 
