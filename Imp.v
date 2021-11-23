@@ -570,7 +570,7 @@ Definition avar := string.
 Inductive aexpv : Type :=
   | AvNum   : nat            -> aexpv
   | AvId    : string         -> aexpv
-  | AvVar   : avar         -> aexpv
+  | AvVar   : avar           -> aexpv
   | AvPlus  : aexpv -> aexpv -> aexpv
   | AvMinus : aexpv -> aexpv -> aexpv
   | AvMult  : aexpv -> aexpv -> aexpv.
@@ -585,66 +585,78 @@ Inductive assn : Type :=
   | AsAnd   : assn  -> assn  -> assn
   | AsOr    : assn  -> assn  -> assn
   | AsImp   : assn  -> assn  -> assn
-  | AsAll   : avar -> assn -> assn
-  | AsEx    : avar -> assn -> assn.
+  | AsAll   : avar  -> assn  -> assn
+  | AsEx    : avar  -> assn  -> assn.
 
 
-(* TODO: define fv() and subst(). *)
-Section Subst.
-  Context {A : Type}
-          (fv_av : aexpv -> (A -> Prop))
-          (fv_as : assn  -> (A -> Prop))
-          (subst_av : aexpv -> A -> aexpv -> aexpv)
-          (subst_as : assn  -> A -> aexpv -> assn).
 
-  Notation "a [ x / i ]av" := (subst_av a i x) (at level 40).
-  Notation "a [ x / i ]as" := (subst_as a i x) (at level 40).
+Fixpoint fv_av (a : aexpv) : (avar -> Prop) :=
+  match a with
+  | AvNum n => fun _ => False
+  | AvId  x => fun _ => False
+  | AvVar i => fun j => if (j =? i)%string then True else False
+  | AvPlus  a1 a2 => fun j => fv_av a1 j \/ fv_av a2 j
+  | AvMinus a1 a2 => fun j => fv_av a1 j \/ fv_av a2 j
+  | AvMult  a1 a2 => fun j => fv_av a1 j \/ fv_av a2 j
+  end.
 
-(** §6.3 The semantics of Assn *)
-
-  Fixpoint av (a : aexpv) (I : string -> nat) (st : state): nat :=
-    match a with
-    | AvNum n => n
-    | AvId  x => st x
-    | AvVar i => I i
-    | AvPlus  a1 a2 => (av a1 I st) + (av a2 I st)
-    | AvMinus a1 a2 => (av a1 I st) - (av a2 I st)
-    | AvMult  a1 a2 => (av a1 I st) * (av a2 I st)
-    end.
-
-End Subst.
+Fixpoint fv_as (A : assn) : avar -> Prop :=
+  match A with
+  | AsTrue  => fun _ => False
+  | AsFalse => fun _ => False
+  | AsEq  a1 a2 => fun j => fv_av a1 j \/ fv_av a2 j
+  | AsLe  a1 a2 => fun j => fv_av a1 j \/ fv_av a2 j
+  | AsNot A1    => fv_as A1
+  | AsAnd A1 A2 => fun j => fv_as A1 j \/ fv_as A2 j
+  | AsOr  A1 A2 => fun j => fv_as A1 j \/ fv_as A2 j
+  | AsImp A1 A2 => fun j => fv_as A1 j \/ fv_as A2 j
+  | AsAll i A1  => fun j => if (i =? j)%string then False else fv_as A1 j
+  | AsEx  i A1  => fun j => if (i =? j)%string then False else fv_as A1 j
+  end.
 
 (** Define Sematics of assertions**)
+
+Fixpoint av (a : aexpv) (I : avar -> nat) (st : state) : nat :=
+  match a with
+  | AvNum n => n
+  | AvId  x => st x
+  | AvVar i => I i
+  | AvPlus  a1 a2 => (av a1 I st) + (av a2 I st)
+  | AvMinus a1 a2 => (av a1 I st) - (av a2 I st)
+  | AvMult  a1 a2 => (av a1 I st) * (av a2 I st)
+  end.
+
 
 Fixpoint subst_av (a : aexpv) (i : avar) (a' : aexpv) : aexpv :=
   match a with
     | AvNum n => AvNum n
-    | AvId x => AvId x
-    | AvVar i' => if (string_dec i' i) then a' else AvVar i' 
-    | AvPlus a1 a2 => AvPlus (subst_av a1 i a') (subst_av a2 i a')
+    | AvId  x => AvId x
+    | AvVar j => if (j =? i)%string then a' else AvVar j 
+    | AvPlus  a1 a2 => AvPlus  (subst_av a1 i a') (subst_av a2 i a')
     | AvMinus a1 a2 => AvMinus (subst_av a1 i a') (subst_av a2 i a')
-    | AvMult a1 a2 => AvMult (subst_av a1 i a') (subst_av a2 i a')
+    | AvMult  a1 a2 => AvMult  (subst_av a1 i a') (subst_av a2 i a')
   end.
 
-  Check string_dec.
+(* Substitution for assertions, pg 83*)
 
-  (* Substitution for assertions, pg 83*)
-
-Fixpoint subst_as (ass : assn) (i: avar) (a : aexpv) : assn :=
+Fixpoint subst_as (ass : assn) (i : avar) (a : aexpv) : assn :=
   match ass with 
   | AsTrue  => AsTrue
   | AsFalse => AsFalse
-  | AsEq a1 a2 => AsEq (subst_av a1 i a) (subst_av a2 i a)
-  | AsLe a1 a2 => AsLe (subst_av a1 i a) (subst_av a2 i a)
-  | AsNot a1 => AsNot (subst_as a1 i a)
+  | AsEq  a1 a2 => AsEq  (subst_av a1 i a) (subst_av a2 i a)
+  | AsLe  a1 a2 => AsLe  (subst_av a1 i a) (subst_av a2 i a)
+  | AsNot a1    => AsNot (subst_as a1 i a)
   | AsAnd a1 a2 => AsAnd (subst_as a1 i a) (subst_as a2 i a)
-  | AsOr a1 a2 => AsOr (subst_as a1 i a) (subst_as a2 i a)  
+  | AsOr  a1 a2 => AsOr  (subst_as a1 i a) (subst_as a2 i a)  
   | AsImp a1 a2 => AsImp (subst_as a1 i a) (subst_as a2 i a)
-  | AsAll j a1 => AsAll j (if (string_dec j i) then  a1 else subst_as a1 i a)
-  | AsEx j a1 => AsEx j (if (j =? i)%string then  a1 else subst_as a1 i a)
+  | AsAll j  a1 => AsAll j (if (j =? i)%string then a1 else subst_as a1 i a)
+  | AsEx  j  a1 => AsEx  j (if (j =? i)%string then a1 else subst_as a1 i a)
   end.
 
+Notation "a [ x / i ]av" := (subst_av a i x) (at level 40).
+Notation "a [ x / i ]as" := (subst_as a i x) (at level 40).
 
 
+(** §6.3 The semantics of Assn *)
 
 
