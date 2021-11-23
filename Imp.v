@@ -563,11 +563,14 @@ Qed.
 (* ####################################################### *)
 (** §6.2 The Assertion Language Assn *)
 
+Definition avar := string.
+
+
 (* Extending aexp to include integer variables (c.f. the beginning of p.81) *)
 Inductive aexpv : Type :=
   | AvNum   : nat            -> aexpv
   | AvId    : string         -> aexpv
-  | AvVar   : string         -> aexpv
+  | AvVar   : avar         -> aexpv
   | AvPlus  : aexpv -> aexpv -> aexpv
   | AvMinus : aexpv -> aexpv -> aexpv
   | AvMult  : aexpv -> aexpv -> aexpv.
@@ -582,8 +585,8 @@ Inductive assn : Type :=
   | AsAnd   : assn  -> assn  -> assn
   | AsOr    : assn  -> assn  -> assn
   | AsImp   : assn  -> assn  -> assn
-  | AsAll   : string -> assn -> assn
-  | AsEx    : string -> assn -> assn.
+  | AsAll   : avar -> assn -> assn
+  | AsEx    : avar -> assn -> assn.
 
 
 (* TODO: define fv() and subst(). *)
@@ -610,6 +613,36 @@ Section Subst.
     end.
 
 End Subst.
+
+(** Define Sematics of assertions**)
+
+Fixpoint subst_av (a : aexpv) (i : avar) (a' : aexpv) : aexpv :=
+  match a with
+    | AvNum n => AvNum n
+    | AvId x => AvId x
+    | AvVar i' => if (string_dec i' i) then a' else AvVar i' 
+    | AvPlus a1 a2 => AvPlus (subst_av a1 i a') (subst_av a2 i a')
+    | AvMinus a1 a2 => AvMinus (subst_av a1 i a') (subst_av a2 i a')
+    | AvMult a1 a2 => AvMult (subst_av a1 i a') (subst_av a2 i a')
+  end.
+
+  Check string_dec.
+
+  (* Substitution for assertions, pg 83*)
+
+Fixpoint subst_as (ass : assn) (i: avar) (a : aexpv) : assn :=
+  match ass with 
+  | AsTrue  => AsTrue
+  | AsFalse => AsFalse
+  | AsEq a1 a2 => AsEq (subst_av a1 i a) (subst_av a2 i a)
+  | AsLe a1 a2 => AsLe (subst_av a1 i a) (subst_av a2 i a)
+  | AsNot a1 => AsNot (subst_as a1 i a)
+  | AsAnd a1 a2 => AsAnd (subst_as a1 i a) (subst_as a2 i a)
+  | AsOr a1 a2 => AsOr (subst_as a1 i a) (subst_as a2 i a)  
+  | AsImp a1 a2 => AsImp (subst_as a1 i a) (subst_as a2 i a)
+  | AsAll j a1 => AsAll j (if (string_dec j i) then  a1 else subst_as a1 i a)
+  | AsEx j a1 => AsEx j (if (j =? i)%string then  a1 else subst_as a1 i a)
+  end.
 
 
 
