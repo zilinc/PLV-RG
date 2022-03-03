@@ -1,5 +1,9 @@
 # PL&V Reading Group
 
+Please read the [Wiki](https://github.com/zilinc/PLV-RG/wiki) for more information about the reading group.
+
+## Formalisation
+
 * `Impl.v`: A Coq formalisation of the book _The Formal Semantics of
   Programming Languages: An Introduction_ by Glynn Winskel.
 
