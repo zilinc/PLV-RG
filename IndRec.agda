@@ -11,9 +11,9 @@ open import Data.Nat.Base
 -- open import Data.Nat.Properties
 open import Data.Product using (Σ; proj₁; proj₂; _,_; <_,_>; uncurry; curry; _×_; ∃; ∃-syntax)
 -- open import Data.Sum using (_⊎_; inj₁; inj₂; [_,_]′)
--- open import Function using (_∘_; _$_; case_of_; id; flip)
--- open import Function.Bundles
--- open Inverse
+open import Function using (_∘_; _$_; case_of_; id; flip)
+open import Function.Bundles
+open Inverse
 open import Relation.Binary.PropositionalEquality hiding ([_]; Extensionality; ∀-extensionality; cong₂)
 -- open import Relation.Nullary
 open ≡-Reasoning
@@ -48,10 +48,28 @@ module _ where
   Fresh′ : ℕ → List′ → Set
   Fresh′ a nil′ = ⊤
   Fresh′ a (cons′ b l) = a ≢ b × Fresh′ a l
+  
+  AllFresh : List′ → Set
+  AllFresh nil′ = ⊤
+  AllFresh (cons′ a l) = Fresh′ a l × AllFresh l
+
+  AllFresh-tail : ∀{x}{xs} → AllFresh (cons′ x xs) → AllFresh xs
+  AllFresh-tail {xs = nil′} p = tt
+  AllFresh-tail {xs = cons′ a as} (_ , p) = p
 
   data DList′ : List′ → Set → Set₁ where
     dnil′  : DList′ nil′ ⊤
     dcons′ : ∀{l}{prf} → (a : ℕ) → DList′ l prf → DList′ (cons′ a l) ((Fresh′ a l) × prf)
+
+
+  data DList″ : Set where
+    dl″ : (l : List′) → AllFresh l → DList″
+
+  undl″-l : DList″ → List′
+  undl″-l (dl″ l _) = l
+
+  undl″-p : DList″ → ∃[ l ] AllFresh l
+  undl″-p (dl″ l p) = l , p
 
   3≢5 : 3 ≢ 5
   3≢5 = λ ()
@@ -61,6 +79,71 @@ module _ where
 
   ex₁′ : DList′ (cons′ 3 (cons′ 5 nil′)) (Fresh′ 3 (cons′ 5 nil′) × Fresh′ 5 nil′ × ⊤)
   ex₁′ = dcons′ 3 (dcons′ 5 dnil′)
+
+  ex₁″ : DList″
+  ex₁″ = dl″ (cons′ 3 (cons′ 5 nil′)) ((3≢5 , tt) , (tt , tt))
+
+  DList→List′ : DList → List′
+  DList→List′ dnil = nil′
+  DList→List′ (dcons a l x) = cons′ a (DList→List′ l)
+
+
+  dl-iso : DList ↔ DList″
+
+  Fresh→Fresh′ : ∀{a}{l}{l″}
+               → (f dl-iso l ≡ l″)
+               → Fresh a l
+               → Fresh′ a (undl″-l l″)
+
+  Fresh→AllFresh : ∀{a}{l}{l″}
+                 → (f dl-iso l ≡ l″)
+                 → Fresh a l
+                 → AllFresh (undl″-l l″)
+
+  All/Fresh′→Fresh : ∀{a}{l}{l″}
+         → (l ≡ f⁻¹ dl-iso l″)
+         → Fresh′ a (undl″-l l″) × AllFresh (undl″-l l″)
+         → Fresh a l
+
+  f dl-iso dnil = dl″ nil′ tt
+  f dl-iso (dcons a l p)
+    = dl″ (cons′ a (undl″-l (f dl-iso l)))
+          ((Fresh→Fresh′ {l = l}{l″ = f dl-iso l} refl p) ,
+           (Fresh→AllFresh {a = a}{l = l}{l″ = f dl-iso l} refl p))
+
+  f⁻¹ dl-iso (dl″ nil′ p) = dnil
+  f⁻¹ dl-iso (dl″ (cons′ a l′) p)
+    = dcons a (f⁻¹ dl-iso (dl″ l′ (proj₂ p)))
+              (All/Fresh′→Fresh {l″ = dl″ l′ (proj₂ p)} refl p)
+
+  cong₁ dl-iso refl = refl
+
+  cong₂ dl-iso refl = refl
+
+  -- Can't do any further, otherwise an Agda bug occurs.
+  inverse dl-iso = (λ x → invˡ) , (λ x → invʳ)
+    where invˡ : ∀{x} → f dl-iso (f⁻¹ dl-iso x) ≡ x
+          invˡ {dl″ nil′ _} = refl
+          invˡ {dl″ (cons′ a l) p} = {!!}
+
+          invʳ : ∀{x} → f⁻¹ dl-iso (f dl-iso x) ≡ x
+          invʳ {dnil} = refl
+          invʳ {dcons a l p} = {!!}
+
+
+  Fresh→Fresh′ {a} {dnil} eq p rewrite sym eq = tt
+  Fresh→Fresh′ {a} {dcons a₁ l x} eq p rewrite sym eq
+    = proj₁ p ,  Fresh→Fresh′ {l″ = f dl-iso l} refl (proj₂ p)
+
+  Fresh→AllFresh {l = dnil} eq p rewrite sym eq = tt
+  Fresh→AllFresh {l = dcons a l x} eq p rewrite sym eq
+    = (Fresh→Fresh′ {l″ = f dl-iso l} refl x) , Fresh→AllFresh {a = a}{l = l}{l″ = f dl-iso l} refl x
+
+  All/Fresh′→Fresh {a} {l″ = dl″ nil′ x} eq p rewrite eq = tt
+  All/Fresh′→Fresh {a} {l″ = dl″ (cons′ b l) x} eq p rewrite eq
+    = (proj₁ ∘ proj₁ $ p) , prf
+    where prf : Fresh a (f⁻¹ dl-iso (dl″ l (proj₂ x)))
+          prf = {!!}  -- This will trigger an Agda internal bug!!!
 
 
 -- --------------------------------------------------------------------------
