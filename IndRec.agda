@@ -1,6 +1,6 @@
 module IndRec where
 
--- open import Agda.Builtin.Nat using (_-_)
+open import Agda.Builtin.Nat using (_-_)
 open import Agda.Builtin.Unit using (⊤; tt)
 -- open import Agda.Primitive
 open import Data.Bool hiding (T)
@@ -14,7 +14,7 @@ open import Data.Product using (Σ; proj₁; proj₂; _,_; <_,_>; uncurry; curry
 open import Function using (_∘_; _$_; case_of_; id; flip)
 open import Function.Bundles
 open Inverse
-open import Relation.Binary.PropositionalEquality hiding ([_]; Extensionality; ∀-extensionality; cong₂)
+open import Relation.Binary.PropositionalEquality renaming (cong₂ to cong₂≡) hiding ([_]; Extensionality; ∀-extensionality)
 -- open import Relation.Nullary
 open ≡-Reasoning
 
@@ -120,7 +120,6 @@ module _ where
 
   cong₂ dl-iso refl = refl
 
-  -- Can't do any further, otherwise an Agda bug occurs.
   inverse dl-iso = (λ x → invˡ) , (λ x → invʳ)
     where invˡ : ∀{x} → f dl-iso (f⁻¹ dl-iso x) ≡ x
           invˡ {dl″ nil′ _} = refl
@@ -130,7 +129,6 @@ module _ where
           invʳ {dnil} = refl
           invʳ {dcons a l p} = {!!}
 
-
   Fresh→Fresh′ {a} {dnil} eq p rewrite sym eq = tt
   Fresh→Fresh′ {a} {dcons a₁ l x} eq p rewrite sym eq
     = proj₁ p ,  Fresh→Fresh′ {l″ = f dl-iso l} refl (proj₂ p)
@@ -139,11 +137,10 @@ module _ where
   Fresh→AllFresh {l = dcons a l x} eq p rewrite sym eq
     = (Fresh→Fresh′ {l″ = f dl-iso l} refl x) , Fresh→AllFresh {a = a}{l = l}{l″ = f dl-iso l} refl x
 
+  {-# TERMINATING #-}
   All/Fresh′→Fresh {a} {l″ = dl″ nil′ x} eq p rewrite eq = tt
   All/Fresh′→Fresh {a} {l″ = dl″ (cons′ b l) x} eq p rewrite eq
-    = (proj₁ ∘ proj₁ $ p) , prf
-    where prf : Fresh a (f⁻¹ dl-iso (dl″ l (proj₂ x)))
-          prf = {!!}  -- This will trigger an Agda internal bug!!!
+    = (proj₁ ∘ proj₁ $ p) , All/Fresh′→Fresh {a = a}{l″ = dl″ l (proj₂ x)} refl ((proj₂ ∘ proj₁ $ p) , (proj₂ x))
 
 
 -- --------------------------------------------------------------------------
@@ -162,7 +159,28 @@ module _ where
   T (π u u′) = (a : T u) → T (u′ a)
 
 
+module _ where
 
+-- XList is a list, which, at every xcons node, it keeps a function
+-- whose type is (ℕ, ℕ, ..., ℕ) → ℕ, where the domain is a k-tuple
+-- of ℕs, where k is the length of the tail of the xlist.
+
+
+  data XList : Set₁
+  Len : XList → Set
+
+  data XList where
+    xnil  : XList
+    xcons : (a : ℕ) → (l : XList) → (Len l → ℕ) → XList
+
+  Len xnil = ℕ
+  Len (xcons a l _) = ℕ × Len l
+
+  ex₂ : XList
+  ex₂ = xcons 3 (xcons 5 xnil (λ x → x)) (λ (x , y) → x + y)
+
+  ex₂′ : XList
+  ex₂′ = xcons 3 (xcons 5 xnil λ x → x + 1) λ (x , y) → x * y
 
 
 -- --------------------------------------------------------------------------
