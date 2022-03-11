@@ -6,7 +6,7 @@ open import Agda.Builtin.Unit using (⊤; tt)
 open import Data.Bool hiding (T)
 -- open import Data.Empty
 -- open import Data.List
--- open import Data.Nat
+open import Data.Nat
 open import Data.Nat.Base
 -- open import Data.Nat.Properties
 open import Data.Product using (Σ; proj₁; proj₂; _,_; <_,_>; uncurry; curry; _×_; ∃; ∃-syntax)
@@ -19,10 +19,22 @@ open import Relation.Binary.PropositionalEquality renaming (cong₂ to cong₂�
 open ≡-Reasoning
 
 
+data List′ : Set where
+  nil′  : List′
+  cons′ : ℕ → List′ → List′
+
+all : (ℕ → Bool) → List′ → Bool
+all p nil′ = true
+all p (cons′ a as) = p a ∧ all p as
+
+Len′ : List′ → Set
+Len′ nil′ = ℕ
+Len′ (cons′ _ l) = ℕ × Len′ l
+
 -- --------------------------------------------------------------------------
 -- DList: it does not have to use induction-recursion.
 
-module _ where
+module DList where
 
   open Data.Bool using (T)
 
@@ -35,15 +47,6 @@ module _ where
 
   Fresh a dnil = ⊤
   Fresh a (dcons b l _) = a ≢ b × Fresh a l
-
-
-  data List′ : Set where
-    nil′  : List′
-    cons′ : ℕ → List′ → List′
-
-  all : (ℕ → Bool) → List′ → Bool
-  all p nil′ = true
-  all p (cons′ a as) = p a ∧ all p as
 
   Fresh′ : ℕ → List′ → Set
   Fresh′ a nil′ = ⊤
@@ -146,7 +149,7 @@ module _ where
 -- --------------------------------------------------------------------------
 -- An exampe where induction-recursion is necessary.
 
-module _ where
+module Universe where
 
   data U : Set₁
   T : U → Set₁
@@ -159,14 +162,14 @@ module _ where
   T (π u u′) = (a : T u) → T (u′ a)
 
 
-module _ where
 
--- XList is a list, which, at every xcons node, it keeps a function
--- whose type is (ℕ, ℕ, ..., ℕ) → ℕ, where the domain is a k-tuple
--- of ℕs, where k is the length of the tail of the xlist.
+module XList1 where
 
+  -- XList is a list, which, at every xcons node, it keeps a function
+  -- whose type is (ℕ, ℕ, ..., ℕ) → ℕ, where the domain is a k-tuple
+  -- of ℕs, where k is the length of the tail of the xlist.
 
-  data XList : Set₁
+  data XList : Set
   Len : XList → Set
 
   data XList where
@@ -176,14 +179,71 @@ module _ where
   Len xnil = ℕ
   Len (xcons a l _) = ℕ × Len l
 
-  ex₂ : XList
-  ex₂ = xcons 3 (xcons 5 xnil (λ x → x)) (λ (x , y) → x + y)
+  ex₁ : XList
+  ex₁ = xcons 3 (xcons 5 xnil (λ x → x)) (λ (x , y) → x + y)
 
-  ex₂′ : XList
-  ex₂′ = xcons 3 (xcons 5 xnil λ x → x + 1) λ (x , y) → x * y
+  ex₂ : XList
+  ex₂ = xcons 3 (xcons 5 xnil λ x → x + 1) λ (x , y) → x * y
+
+module XList2 where
+
+  data XList : Set
+  Len : XList → Set
+
+  data XList where
+    xnil  : XList
+    xcons : (a : ℕ) → (l : XList) → (Len l) → XList
+
+  Len xnil = ℕ
+  Len (xcons a l _) = ℕ × Len l
+
+  ex : XList
+  ex = xcons 3 (xcons 5 xnil 0) (0 , 0) 
+
+
+module XList2≡ where
+  -- It should be equivalent to XList2
+
+  data XList′ : List′ → Set₁ where
+    xnil′  : XList′ nil′
+    xcons′ : ∀{l} → (a : ℕ) → XList′ l → Len′ l → XList′ (cons′ a l)
+
+  ex : ∃[ l ] XList′ l
+  ex = _ , (xcons′ 3 (xcons′ 5 xnil′ 0) (0 , 0))
+
+
+module XList1≡ where
+  -- It should be equivalent to XList1
+
+  data XList′ : List′ → Set₁ where
+    xnil′  : XList′ nil′
+    xcons′ : ∀{l} → (a : ℕ) → XList′ l → (Len′ l → ℕ) → XList′ (cons′ a l)
+
+  ex : ∃[ l ] XList′ l
+  ex = _ , xcons′ 3 (xcons′ 5 xnil′ λ x → x) λ (x , y) → x + y
 
 
 -- --------------------------------------------------------------------------
 -- An example where induction-induction will lead to different results than
 -- using induction-recursion.
+
+
+
+-- --------------------------------------------------------------------------
+-- Experiments on "boxing up" a family of indexed types
+
+module SNats where
+
+  data SNat : ℕ → Set where
+    sze : SNat 0
+    ssu : ∀{n} → SNat n → SNat (n + 1)
+
+  -- Now, we want to have a type of all SNats
+
+  SNats : Set
+  SNats = Σ ℕ λ n → SNat n
+
+  -- s1 ∈ SNats
+  s1∈SNats : SNats
+  s1∈SNats = (_ , ssu sze)
 
