@@ -161,6 +161,36 @@ module Universe where
   T ★ = Set
   T (π u u′) = (a : T u) → T (u′ a)
 
+  ex : U
+  ex = π ★ λ x → ★
+
+  -- import Axiom.Extensionality.Propositional
+
+  _ = T ex  -- Set → Set
+
+
+module Universe≡ where
+
+  data U⊥ : Set where
+    ★⊥ : U⊥
+    π⊥ : U⊥ → U⊥
+
+  T⊥ : U⊥ → Set₁
+  T⊥ ★⊥ = Set
+  T⊥ (π⊥ x) = T⊥ x → U⊥
+
+  data U : U⊥ → Set₁ where
+    ★ : U ★⊥
+    π : ∀{x} → (u : U x) → (T⊥ x → ∃[ y ] U y) → U (π⊥ x)
+
+  T : ∀{x} → U x → Set₁
+  T {★⊥} ux = Set
+  T {π⊥ x} (π ux _) = (s : T ux) → T {x} ux
+
+  ex : ∃[ x ] U x
+  ex = (π⊥ ★⊥) , (π ★ (λ _ → ★⊥ , ★))
+
+  _ = T (proj₂ ex) -- Set → Set
 
 
 module XList1 where
@@ -168,6 +198,9 @@ module XList1 where
   -- XList is a list, which, at every xcons node, it keeps a function
   -- whose type is (ℕ, ℕ, ..., ℕ) → ℕ, where the domain is a k-tuple
   -- of ℕs, where k is the length of the tail of the xlist.
+
+  -- It doesn't seem to make any difference should we change the
+  -- third argument of `xcons′ from (Len l → ℕ) to (Len l → XList).
 
   data XList : Set
   Len : XList → Set
@@ -185,6 +218,28 @@ module XList1 where
   ex₂ : XList
   ex₂ = xcons 3 (xcons 5 xnil λ x → x + 1) λ (x , y) → x * y
 
+  ex₁-prf : Len ex₁ ≡ (ℕ × ℕ × ℕ)
+  ex₁-prf = refl
+
+
+module XList1≡ where
+  -- It should be equivalent to XList1
+
+  data XList′ : List′ → Set₁ where
+    xnil′  : XList′ nil′
+    xcons′ : ∀{l} → (a : ℕ) → XList′ l → (Len′ l → ℕ) → XList′ (cons′ a l)
+
+  ex : ∃[ l ] XList′ l
+  ex = _ , xcons′ 3 (xcons′ 5 xnil′ λ x → x) λ (x , y) → x + y
+
+  LEN′ : ∀{l} → XList′ l → Set
+  LEN′ {nil′} xl = ℕ
+  LEN′ {cons′ a l} (xcons′ .a xl _) = ℕ × LEN′ {l} xl
+
+  ex-prf : LEN′ (proj₂ ex) ≡ (ℕ × ℕ × ℕ)
+  ex-prf = refl
+
+
 module XList2 where
 
   data XList : Set
@@ -192,7 +247,7 @@ module XList2 where
 
   data XList where
     xnil  : XList
-    xcons : (a : ℕ) → (l : XList) → (Len l) → XList
+    xcons : (a : ℕ) → (l : XList) → Len l → XList
 
   Len xnil = ℕ
   Len (xcons a l _) = ℕ × Len l
@@ -210,17 +265,6 @@ module XList2≡ where
 
   ex : ∃[ l ] XList′ l
   ex = _ , (xcons′ 3 (xcons′ 5 xnil′ 0) (0 , 0))
-
-
-module XList1≡ where
-  -- It should be equivalent to XList1
-
-  data XList′ : List′ → Set₁ where
-    xnil′  : XList′ nil′
-    xcons′ : ∀{l} → (a : ℕ) → XList′ l → (Len′ l → ℕ) → XList′ (cons′ a l)
-
-  ex : ∃[ l ] XList′ l
-  ex = _ , xcons′ 3 (xcons′ 5 xnil′ λ x → x) λ (x , y) → x + y
 
 
 -- --------------------------------------------------------------------------
